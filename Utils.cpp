@@ -63,6 +63,8 @@ bool ReadTexture(ID3D11Texture2D* tex, int width, int height, const std::functio
 
 bool SaveAsPNG(const char* path, int w, int h, int src_stride, const void* data, bool flip_y)
 {
+    //return false; // for profile
+
     std::vector<byte> buf(w * h * 4);
     int dst_stride = w * 4;
     auto src = (const byte*)data;
@@ -96,4 +98,39 @@ bool SaveAsPNG(const char* path, int w, int h, int src_stride, const void* data,
         }
     }
     return stbi_write_png(path, w, h, 4, buf.data(), dst_stride);
+}
+
+
+static uint64_t NowNS()
+{
+    using namespace std::chrono;
+    return duration_cast<nanoseconds>(steady_clock::now().time_since_epoch()).count();
+}
+
+static void DbgPrint(const char* fmt, ...)
+{
+    char buf[1024 * 2];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, std::size(buf), fmt, args);
+    va_end(args);
+    ::OutputDebugStringA(buf);
+}
+
+ProfileTimer::ProfileTimer(const char* mes, ...)
+{
+    va_list args;
+    va_start(args, mes);
+    char buf[1024];
+    vsnprintf(buf, sizeof(buf), mes, args);
+    va_end(args);
+    m_message = buf;
+
+    m_begin = NowNS();
+}
+
+ProfileTimer::~ProfileTimer()
+{
+    float elapsed = (NowNS() - m_begin) / 1000000.0;
+    DbgPrint("%s - %.2fms\n", m_message.c_str(), elapsed);
 }

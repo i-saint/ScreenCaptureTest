@@ -32,6 +32,7 @@ void DesktopDuplication::stop()
 
 bool DesktopDuplication::start(int monitor_index)
 {
+    sctProfile("DesktopDuplication::start");
     // create device
     UINT flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
     ::D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, flags, nullptr, 0, D3D11_SDK_VERSION, m_device.put(), nullptr, nullptr);
@@ -54,6 +55,7 @@ bool DesktopDuplication::getFrame(int timeout_ms, const Callback& calback)
     if (!m_duplication)
         return false;
 
+    sctProfile("DesktopDuplication::getFrame");
     bool ret = false;
     com_ptr<IDXGIResource> resource;
     DXGI_OUTDUPL_FRAME_INFO frame_info{};
@@ -85,7 +87,7 @@ void TestDesktopDuplication()
     };
 
     DesktopDuplication duplication;
-    if (duplication.start(1)) {
+    if (duplication.start(0)) {
         while (!arrived) {
             duplication.getFrame(500, callback);
         }

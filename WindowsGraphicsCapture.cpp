@@ -26,9 +26,13 @@ public:
     GraphicsCapture();
     ~GraphicsCapture();
     bool start(HWND hwnd, bool free_threaded, const Callback& callback);
+    bool start(HMONITOR hmon, bool free_threaded, const Callback& callback);
     void stop();
 
 private:
+    template<class CreateCaptureItem>
+    bool startImpl(bool free_threaded, const Callback& callback, const CreateCaptureItem& cci);
+
     void onFrameArrived(
         winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool const& sender,
         winrt::Windows::Foundation::IInspectable const& args);
@@ -78,15 +82,17 @@ void GraphicsCapture::stop()
     m_callback = {};
 }
 
-bool GraphicsCapture::start(HWND hwnd, bool free_threaded, const Callback& callback)
+template<class CreateCaptureItem>
+bool GraphicsCapture::startImpl(bool free_threaded, const Callback& callback, const CreateCaptureItem& cci)
 {
     stop();
     m_callback = callback;
 
+    sctProfile("GraphicsCapture::start");
     // create capture item
     auto factory = get_activation_factory<GraphicsCaptureItem>();
     auto interop = factory.as<IGraphicsCaptureItemInterop>();
-    interop->CreateForWindow(hwnd, guid_of<ABI::Windows::Graphics::Capture::IGraphicsCaptureItem>(), put_abi(m_capture_item));
+    cci(interop);
 
     if (m_capture_item) {
         // create frame pool
@@ -107,8 +113,24 @@ bool GraphicsCapture::start(HWND hwnd, bool free_threaded, const Callback& callb
     }
 }
 
+bool GraphicsCapture::start(HWND hwnd, bool free_threaded, const Callback& callback)
+{
+    return startImpl(free_threaded, callback, [&](auto interop) {
+        interop->CreateForWindow(hwnd, guid_of<ABI::Windows::Graphics::Capture::IGraphicsCaptureItem>(), put_abi(m_capture_item));
+        });
+
+}
+
+bool GraphicsCapture::start(HMONITOR hmon, bool free_threaded, const Callback& callback)
+{
+    return startImpl(free_threaded, callback, [&](auto interop) {
+        interop->CreateForMonitor(hmon, guid_of<ABI::Windows::Graphics::Capture::IGraphicsCaptureItem>(), put_abi(m_capture_item));
+        });
+}
+
 void GraphicsCapture::onFrameArrived(winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool const& sender, winrt::Windows::Foundation::IInspectable const& args)
 {
+    sctProfile("GraphicsCapture::onFrameArrived");
     auto frame = sender.TryGetNextFrame();
     auto size = frame.ContentSize();
 
@@ -120,8 +142,9 @@ void GraphicsCapture::onFrameArrived(winrt::Windows::Graphics::Capture::Direct3D
 
 void TestGraphicsCapture()
 {
+    HMONITOR target = ::MonitorFromPoint({ 0, 0 }, MONITOR_DEFAULTTOPRIMARY);
+
     GraphicsCapture capture;
-    HWND target = ::GetForegroundWindow();
 
     // single threaded
     {

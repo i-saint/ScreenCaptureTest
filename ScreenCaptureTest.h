@@ -9,3 +9,15 @@ bool SaveAsPNG(const char* path, int w, int h, int stride, const void* data, boo
 void TestGDI();
 void TestDesktopDuplication();
 void TestGraphicsCapture();
+
+class ProfileTimer
+{
+public:
+    ProfileTimer(const char* mes, ...);
+    ~ProfileTimer();
+
+private:
+    uint64_t m_begin = 0;
+    std::string m_message;
+};
+#define sctProfile(...) ProfileTimer _dbg_timer(__VA_ARGS__)

@@ -40,6 +40,7 @@ static bool CaptureImpl(RECT rect, HWND hwnd, const BitmapCallback& callback, co
 
 bool CaptureScreen(RECT rect, const BitmapCallback& callback)
 {
+    sctProfile("CaptureScreen");
     int x = rect.left;
     int y = rect.top;
     int width = rect.right - rect.left;
@@ -51,15 +52,37 @@ bool CaptureScreen(RECT rect, const BitmapCallback& callback)
 
 bool CaptureEntireScreen(const BitmapCallback& callback)
 {
+    sctProfile("CaptureEntireScreen");
     int x = ::GetSystemMetrics(SM_XVIRTUALSCREEN);
     int y = ::GetSystemMetrics(SM_YVIRTUALSCREEN);
     int width = ::GetSystemMetrics(SM_CXVIRTUALSCREEN);
     int height = ::GetSystemMetrics(SM_CYVIRTUALSCREEN);
-    return CaptureScreen({ x, y, width + x, height + y }, callback);
+    return CaptureImpl({ x, y, width + x, height + y }, nullptr, callback, [&](HDC hscreen, HDC hdc) {
+        ::StretchBlt(hdc, 0, 0, width, height, hscreen, x, y, width, height, SRCCOPY);
+        });
+}
+
+bool CaptureMonitor(HMONITOR hmon, const BitmapCallback& callback)
+{
+    sctProfile("CaptureMonitor");
+    MONITORINFO info{};
+    info.cbSize = sizeof(MONITORINFO);
+    ::GetMonitorInfoA(hmon, &info);
+
+    RECT rect = info.rcMonitor;
+    int x = rect.left;
+    int y = rect.top;
+    int width = rect.right - rect.left;
+    int height = rect.bottom - rect.top;
+
+    return CaptureImpl(rect, nullptr, callback, [&](HDC hscreen, HDC hdc) {
+        ::StretchBlt(hdc, 0, 0, width, height, hscreen, x, y, width, height, SRCCOPY);
+        });
 }
 
 bool CaptureWindow(HWND hwnd, const BitmapCallback& callback)
 {
+    sctProfile("CaptureWindow");
     RECT rect{};
     ::GetWindowRect(hwnd, &rect);
 
@@ -77,8 +100,8 @@ bool CaptureWindow(HWND hwnd, const BitmapCallback& callback)
 
 void TestGDI()
 {
-    // DIB image is BGRA and upside-down so need to flip y
-    CaptureEntireScreen([](const void* data, int w, int h) {
-        SaveAsPNG("CaptureEntireScreen.png", w, h, w * 4, data, true);
+    HMONITOR target = ::MonitorFromPoint({ 0, 0 }, MONITOR_DEFAULTTOPRIMARY);
+    CaptureMonitor(target, [](const void* data, int w, int h) {
+        SaveAsPNG("CaptureMonitor.png", w, h, w * 4, data, true);
         });
 }
